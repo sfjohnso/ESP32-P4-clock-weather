@@ -1,0 +1,15 @@
+# build output and fetched dependencies
+p4clock/build/
+p4clock/sdkconfig
+p4clock/sdkconfig.old
+p4clock/dependencies.lock
+p4clock/managed_components/
+
+# your own settings (Wi-Fi password!) - copy user_config.h.example instead
+p4clock/main/user_config.h
+
+# generated from a font file you supply (Segoe UI is not redistributable)
+p4clock/main/font_data.c
+
+__pycache__/
+*.pyc
