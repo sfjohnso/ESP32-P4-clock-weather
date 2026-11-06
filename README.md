@@ -74,15 +74,17 @@ You need ESP-IDF 5.5 (developed and tested with 5.5.6), Python with Pillow
 
        python tools/gen_fonts.py
 
-   On Windows this uses the Segoe UI files already installed. On any other system, or
+   Run it with a normal Python that has Pillow, not inside the ESP-IDF shell (its
+   Python does not include Pillow). On Windows this uses the Segoe UI files already installed. On any other system, or
    to use a different look, pass two TrueType files, a regular and a semibold one:
 
        python tools/gen_fonts.py --regular /path/Regular.ttf --semibold /path/Semibold.ttf
 
    The spacing was tuned for Segoe UI; other fonts work but might need small tweaks.
 2. **Build and flash** from an ESP-IDF shell, in `p4clock/` (replace `COM12` with the
-   board's USB serial port):
+   board's USB serial port). `set-target` is needed once on a fresh clone:
 
+       idf.py set-target esp32p4
        idf.py build
        idf.py -p COM12 flash
 
