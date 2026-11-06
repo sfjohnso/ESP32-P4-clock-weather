@@ -97,8 +97,9 @@ If the router is down it keeps retrying. If one weather request fails it keeps t
 old reading and tries again after a minute. The "weather updated N min ago" line at
 the bottom tells you how fresh the data is.
 
-If the picture is upside-down, it should flip by changing the display rotation byte in `lcd_init()`
-(`cmd(0x36, ... 0x28 ...)`) from `0x28` to `0xE8`.
+**Flipping the screen:** touch it anywhere and the picture rotates 180 degrees (touch
+again to flip back), handy when the board is mounted upside-down. The board starts
+in the normal orientation after every power-up.
 
 ## Hardware notes
 
@@ -113,8 +114,9 @@ If the picture is upside-down, it should flip by changing the display rotation b
   (DNS and HTTPS time out with "SDIO RX read exceeds staging target") against the
   older ESP32-C6 firmware that ships on the board. Do not unpin it unless you have
   updated the C6 firmware.
-* **Touch** (not used by this program): FT6336-style controller at I2C address 0x38
-  (SDA 7, SCL 8). Its reset line (GPIO 29) must be driven high, and its interrupt is GPIO 50.
+* **Touch:** FT6336-style controller at I2C address 0x38 (SDA 7, SCL 8). Its reset
+  line (GPIO 29) must be driven high; its interrupt is GPIO 50 (not used here, the
+  program polls). The rotation is the panel's MADCTL byte, `0x28` or `0xE8`.
 * **Flash:** `sdkconfig.defaults` sets 16 MB flash and the large single-app partition
   table; the application is about 1 MB.
 
