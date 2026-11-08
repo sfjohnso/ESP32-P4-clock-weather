@@ -6,8 +6,8 @@ and its password; it does the rest.
 
 ## Using it (for the person receiving the .exe)
 
-1. Plug the board into the PC with a USB-C cable, using the port that makes the board
-   show up as a COM port (the board's other USB-C port does not). If no port appears,
+1. Plug the board into the PC with a USB-C cable, using the **UART-C** port (the
+   board's other USB-C port will not program it). If no port appears,
    install the "CH343" USB serial driver from WCH (wch-ic.com).
 2. Run `P4ClockInstaller.exe`. Windows may warn about an unknown publisher because the
    program is not code-signed: choose "More info", then "Run anyway".

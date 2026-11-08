@@ -166,8 +166,8 @@ def install(address, ssid, password, port, settings_only=False, log=print, confi
     """Looks up the address, then flashes the clock and its settings. Raises InstallError."""
     check_wifi(ssid, password)
     if not port:
-        raise InstallError("No board found. Plug it into the USB-C port that makes it appear as a "
-                           "COM port (the other USB-C port does not), then click Refresh.")
+        raise InstallError("No board found. Plug the cable into the board's UART-C USB-C port (the "
+                           "other USB-C port will not program), then click Refresh.")
     log("Looking up the address...\n")
     g = geocode(address)
     iana, posix_tz = time_zone_for(g["lat"], g["lon"])
@@ -229,7 +229,7 @@ def run_gui():
                     command=lambda: pw_entry.config(show="" if show_pw.get() else "*")).grid(row=3, column=2, padx=6)
     ttk.Label(frame, text="The board uses 2.4 GHz Wi-Fi only. The password is saved on the clock.",
               foreground="#555").grid(row=4, column=1, columnspan=2, sticky="w")
-    ttk.Label(frame, text="Board (USB port)").grid(row=5, column=0, sticky="w", pady=(10, 4))
+    ttk.Label(frame, text="Board (UART-C port)").grid(row=5, column=0, sticky="w", pady=(10, 4))
     port_box = ttk.Combobox(frame, textvariable=port, state="readonly")
     port_box.grid(row=5, column=1, sticky="ew", pady=(10, 4))
 
