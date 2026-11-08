@@ -31,6 +31,12 @@ All personal settings live in one file that is **not** stored in git.
 | `LAT`, `LON` | Latitude and longitude of your location in decimal degrees, as quoted strings (south and west are negative). This **is** what selects the weather. |
 | `TZ_POSIX` | Your time zone, including its daylight-saving rule (examples below). |
 
+These values are the built-in defaults. The firmware also reads a small `config` flash
+partition (a JSON block with `ssid`, `pass`, `label`, `lat`, `lon`, `tz`, at 0x187000, see
+`p4clock/partitions.csv`) and prefers it when present, so the settings can be changed
+without rebuilding. The Windows installer in [`installer/`](installer/) writes that
+partition from a street address, a network name and a password.
+
 ### Choosing a location (zip code to latitude/longitude)
 
 The weather service (Open-Meteo) takes coordinates, not a zip code. Two ways to get them:
@@ -119,6 +125,13 @@ in the normal orientation after every power-up.
   program polls). The rotation is the panel's MADCTL byte, `0x28` or `0xE8`.
 * **Flash:** `sdkconfig.defaults` sets 16 MB flash and the large single-app partition
   table; the application is about 1 MB.
+
+## Also in this repo: an installer
+
+[`installer/`](installer/) is a Windows program that takes a U.S. street address, a Wi-Fi
+name and a password and installs this clock on a board in one click. Its source is here;
+the finished `.exe` is not, because the firmware it carries contains Segoe UI glyph
+data that Microsoft does not allow redistributing.
 
 ## Also in this repo: the launcher
 

@@ -17,3 +17,6 @@ __pycache__/
 # launcher: your location and Wi-Fi settings - copy the .example files instead
 launcher/ClockApp/clock_config.h
 launcher/user_config.h
+
+# installer build output in the clock project
+p4clock/build_installer/
