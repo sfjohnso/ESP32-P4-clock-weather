@@ -7,6 +7,9 @@ and its settings to the board over USB. The location is either
   - a latitude and longitude anywhere in the world, e.g. "51.5074, -0.1278"
     (north and east positive; south and west negative, or add N/S/E/W).
 
+Or skip all of that ("set up from my phone"): the clock then starts in setup mode, shows QR codes
+on its screen, and the Wi-Fi network, password and location are entered on a phone.
+
 The time zone comes from Open-Meteo and its daylight-saving rule from the IANA time zone
 database (the tzdata package). The clock stores only the coordinates, a short place name
 and the time zone, never a street address. The Wi-Fi name and password are stored in the
@@ -191,17 +194,29 @@ def run_esptool(args, log):
         sys.stdout, sys.stderr = old
 
 
-def install(location, ssid, password, port, settings_only=False, log=print, confirm=None):
-    """Looks up the location, then flashes the clock and its settings. Raises InstallError."""
-    check_wifi(ssid, password)
+PHONE_SETUP_CONFIG = b"{}\0"        # empty settings: the clock starts in setup mode
+
+
+def install(location, ssid, password, port, settings_only=False, phone_setup=False, log=print, confirm=None):
+    """Flashes the clock and its settings. Raises InstallError.
+
+    phone_setup: write no settings; the clock opens its setup page (QR codes) on first start.
+    """
     if not port:
         raise InstallError("No board found. Plug the cable into the board's UART-C USB-C port (the "
                            "other USB-C port will not program), then click Refresh.")
-    log("Looking up the location...\n")
-    g = locate(location)
-    iana, posix_tz = time_zone_for(g["lat"], g["lon"])
-    summary = (f"{g['described']}\nClock will show: {g['label']}\n"
-               f"Time zone: {iana}\nWi-Fi network: {ssid}")
+    if phone_setup:
+        config = PHONE_SETUP_CONFIG
+        summary = ("The clock will start in setup mode: it shows two QR codes, and you enter the Wi-Fi network, "
+                   "its password and the location on your phone.")
+    else:
+        check_wifi(ssid, password)
+        log("Looking up the location...\n")
+        g = locate(location)
+        iana, posix_tz = time_zone_for(g["lat"], g["lon"])
+        config = make_config(ssid, password, g, posix_tz)
+        summary = (f"{g['described']}\nClock will show: {g['label']}\n"
+                   f"Time zone: {iana}\nWi-Fi network: {ssid}")
     log(summary + "\n")
     if confirm and not confirm(summary):
         raise InstallError("Cancelled.")
@@ -209,7 +224,7 @@ def install(location, ssid, password, port, settings_only=False, log=print, conf
     with tempfile.TemporaryDirectory() as tmp:
         cfg_path = os.path.join(tmp, "config.bin")
         with open(cfg_path, "wb") as f:
-            f.write(make_config(ssid, password, g, posix_tz))
+            f.write(config)
         files = [(CONFIG_OFFSET, cfg_path)]
         if not settings_only:
             for offset, name in APP_FILES:
@@ -224,7 +239,8 @@ def install(location, ssid, password, port, settings_only=False, log=print, conf
             args += [hex(offset), path]
         log(f"\nWriting to the board on {port}...\n")
         run_esptool(args, log)
-    log("\nDone. The clock restarts by itself and shows the time in about 15 seconds.\n")
+    log("\nDone. " + ("The clock restarts in setup mode: scan the QR code on its screen.\n" if phone_setup else
+                         "The clock restarts by itself and shows the time in about 15 seconds.\n"))
 
 
 # ---------------------------------------------------------------------------
@@ -242,16 +258,18 @@ def run_gui():
     frame.columnconfigure(1, weight=1)
 
     address, ssid, password, port = tk.StringVar(), tk.StringVar(), tk.StringVar(), tk.StringVar()
-    settings_only, show_pw = tk.BooleanVar(), tk.BooleanVar()
+    settings_only, show_pw, phone_setup = tk.BooleanVar(), tk.BooleanVar(), tk.BooleanVar()
 
     ttk.Label(frame, text="Location").grid(row=0, column=0, sticky="w", pady=4)
-    ttk.Entry(frame, textvariable=address).grid(row=0, column=1, columnspan=2, sticky="ew")
+    addr_entry = ttk.Entry(frame, textvariable=address)
+    addr_entry.grid(row=0, column=1, columnspan=2, sticky="ew")
     ttk.Label(frame, text="A U.S. street address (123 Main St, Springfield, IL 62701) or a latitude and "
                           "longitude anywhere in the world (51.5074, -0.1278; south and west are negative). "
                           "Only the coordinates, a short place name and the time zone are stored on the clock.",
               foreground="#555", wraplength=440, justify="left").grid(row=1, column=1, columnspan=2, sticky="w")
     ttk.Label(frame, text="Wi-Fi network name").grid(row=2, column=0, sticky="w", pady=(10, 4))
-    ttk.Entry(frame, textvariable=ssid).grid(row=2, column=1, columnspan=2, sticky="ew", pady=(10, 4))
+    ssid_entry = ttk.Entry(frame, textvariable=ssid)
+    ssid_entry.grid(row=2, column=1, columnspan=2, sticky="ew", pady=(10, 4))
     ttk.Label(frame, text="Wi-Fi password").grid(row=3, column=0, sticky="w", pady=4)
     pw_entry = ttk.Entry(frame, textvariable=password, show="*")
     pw_entry.grid(row=3, column=1, sticky="ew")
@@ -276,8 +294,16 @@ def run_gui():
     ttk.Button(frame, text="Refresh", command=refresh_ports).grid(row=5, column=2, padx=6)
     refresh_ports()
 
-    ttk.Checkbutton(frame, text="Only change the settings (keep the clock program already on the board)",
-                    variable=settings_only).grid(row=6, column=0, columnspan=3, sticky="w", pady=(10, 4))
+    def toggle_phone_setup():
+        state = "disabled" if phone_setup.get() else "normal"
+        for entry in (addr_entry, ssid_entry, pw_entry):
+            entry.config(state=state)
+    options = ttk.Frame(frame)
+    options.grid(row=6, column=0, columnspan=3, sticky="w", pady=(10, 4))
+    ttk.Checkbutton(options, text="I'll enter the Wi-Fi and location on my phone (the clock shows QR codes)",
+                    variable=phone_setup, command=toggle_phone_setup).pack(anchor="w")
+    ttk.Checkbutton(options, text="Only change the settings (keep the clock program already on the board)",
+                    variable=settings_only).pack(anchor="w", pady=(4, 0))
     install_btn = ttk.Button(frame, text="Install")
     install_btn.grid(row=7, column=0, columnspan=3, sticky="ew", pady=8, ipady=4)
     bar = ttk.Progressbar(frame, mode="indeterminate")
@@ -309,8 +335,9 @@ def run_gui():
                     bar.stop()
                     install_btn.config(state="normal")
                     if payload is None:
-                        messagebox.showinfo("Finished", "The clock is installed. It restarts by itself "
-                                                        "and shows the time in about 15 seconds.")
+                        messagebox.showinfo("Finished", "The clock is installed and restarting. With phone setup, "
+                                                        "scan the QR code on its screen to finish; otherwise it "
+                                                        "shows the time in about 15 seconds.")
                     elif str(payload) != "Cancelled.":
                         messagebox.showerror("Could not install", str(payload))
         except queue.Empty:
@@ -337,7 +364,7 @@ def run_gui():
         bar.start(12)
         threading.Thread(target=work, daemon=True, args=(
             (address.get(), ssid.get(), password.get(), port_devices[idx] if idx >= 0 else "",
-             settings_only.get()),)).start()
+             settings_only.get(), phone_setup.get()),)).start()
     install_btn.config(command=start)
     pump()
     root.mainloop()
@@ -351,8 +378,10 @@ def main():
     ap.add_argument("--password-env", metavar="NAME", help="scripted run: environment variable holding the password")
     ap.add_argument("--port", help="scripted run: serial port, e.g. COM12 (default: the Waveshare board)")
     ap.add_argument("--settings-only", action="store_true", help="only rewrite the settings, not the program")
+    ap.add_argument("--phone-setup", action="store_true",
+                    help="scripted run: write no Wi-Fi or location; the clock starts in phone setup mode")
     args = ap.parse_args()
-    if not args.location:
+    if not args.location and not args.phone_setup:
         run_gui()
         return
     port = args.port or next((p[0] for p in find_ports() if p[2]), "")
@@ -363,8 +392,8 @@ def main():
             console.write(text)
             console.flush()
     try:
-        install(args.location, args.ssid or "", os.environ.get(args.password_env or "", ""), port,
-                args.settings_only, log=log)
+        install(args.location or "", args.ssid or "", os.environ.get(args.password_env or "", ""), port,
+                args.settings_only, args.phone_setup, log=log)
     except InstallError as e:
         sys.exit(f"\n{e}")
 
