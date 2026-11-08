@@ -120,6 +120,12 @@ in the normal orientation after every power-up.
 * **Flash:** `sdkconfig.defaults` sets 16 MB flash and the large single-app partition
   table; the application is about 1 MB.
 
+## Also in this repo: the launcher
+
+[`launcher/`](launcher/) has notes on adding apps to the phone-style launcher that
+ships on this board (Waveshare's ESP-Brookesia firmware), a portrait Clock app for
+it, and fixes for Waveshare's standalone camera example on ESP-IDF 5.5.6.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).

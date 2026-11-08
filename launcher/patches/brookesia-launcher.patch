@@ -1,0 +1,108 @@
+diff --git a/firmware/brookesia/main/CMakeLists.txt b/firmware/brookesia/main/CMakeLists.txt
+index eee86cb..1fd2298 100644
+--- a/firmware/brookesia/main/CMakeLists.txt
++++ b/firmware/brookesia/main/CMakeLists.txt
+@@ -18,18 +18,10 @@ idf_component_register(
+         esp_event
+         esp_lvgl_adapter
+         esp_netif
++        lwip
+         esp_wifi
+         nvs_flash
+         board
+ )
+ 
+-# Copy the Xiaozhi UI font into the SPIFFS image source directory.
+-idf_component_get_property(XIAOZHI_FONTS_DIR 78__xiaozhi-fonts COMPONENT_DIR)
+-set(XIAOZHI_FONT_SRC "${XIAOZHI_FONTS_DIR}/cbin/font_puhui_common_20_4.bin")
+-if(XIAOZHI_FONTS_DIR AND EXISTS "${XIAOZHI_FONT_SRC}")
+-    configure_file("${XIAOZHI_FONT_SRC}" "${CMAKE_CURRENT_LIST_DIR}/../spiffs/xiaozhi/font.bin" COPYONLY)
+-else()
+-    message(STATUS "xiaozhi-fonts common font not found; skipping SPIFFS font copy")
+-endif()
+-
+ spiffs_create_partition_image(storage "${CMAKE_CURRENT_LIST_DIR}/../spiffs" FLASH_IN_PROJECT)
+diff --git a/firmware/brookesia/main/main.cpp b/firmware/brookesia/main/main.cpp
+index c61d616..cd79b13 100644
+--- a/firmware/brookesia/main/main.cpp
++++ b/firmware/brookesia/main/main.cpp
+@@ -27,6 +27,8 @@
+ #include "nvs_flash.h"
+ 
+ #include "board.h"
++#include "esp_sntp.h"
++#include "user_config.h"
+ #include "board_wifi.h"
+ #include "SettingsStorage.hpp"
+ #include "BootLoading.hpp"
+@@ -51,14 +53,27 @@ struct BootAppGroup {
+ };
+ 
+ static const BootAppGroup BOOT_APP_GROUPS[] = {
+-    {"Loading application registry...", 65, {"Squareline", "Calculator"}},
++    {"Loading application registry...", 65, {"Clock", "Squareline", "Calculator"}},
+     {"Loading tools...",                74, {"DrawPanel", "SpecAnalyzer"}},
+     {"Loading media...",                82, {"MusicPlayer", "Camera", "VideoPlayer"}},
+-    {"Loading system applications...",  90, {"Settings", "AIChats"}},
++    {"Loading system applications...",  90, {}},
+ };
+ 
+ static std::atomic<bool> s_wifi_connected{false};
+ 
++// Time sync: start SNTP once the first address arrives (the Settings app used to do this, with a
++// Chinese server and China time; the time zone comes from user_config.h now).
++static void start_time_sync()
++{
++    if (esp_sntp_enabled()) {
++        return;
++    }
++    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
++    esp_sntp_setservername(0, "pool.ntp.org");
++    esp_sntp_init();
++    ESP_LOGI(ESP_UTILS_LOG_TAG, "SNTP time sync started");
++}
++
+ // Runs in the Wi-Fi service publisher task; only record the state for the status bar timer.
+ static void wifi_service_status_handler(const adf_event_t *event, void *ctx)
+ {
+@@ -67,6 +82,7 @@ static void wifi_service_status_handler(const adf_event_t *event, void *ctx)
+     switch (event->event_id) {
+     case BOARD_WIFI_EVENT_STA_GOT_IP:
+         s_wifi_connected.store(true, std::memory_order_relaxed);
++        start_time_sync();
+         break;
+     case BOARD_WIFI_EVENT_STA_LOST_IP:
+     case BOARD_WIFI_EVENT_DISCONNECTED:
+@@ -93,6 +109,8 @@ static bool is_wifi_connected()
+ extern "C" void app_main(void)
+ {
+     esp_log_level_set("rpc_rsp", ESP_LOG_ERROR);
++    setenv("TZ", TZ_POSIX, 1);
++    tzset();
+ 
+     ESP_UTILS_LOGI("Reset reason: %d", static_cast<int>(esp_reset_reason()));
+     ESP_UTILS_LOGI("Display ESP-Brookesia phone demo");
+@@ -243,6 +261,11 @@ extern "C" void app_main(void)
+         // Keep booting without networking.
+         ESP_LOGE(ESP_UTILS_LOG_TAG, "Wi-Fi service initialization failed: %s", esp_err_to_name(err));
+     }
++    // Join the fixed network from user_config.h (replaces the Settings app's Wi-Fi picker).
++    err = board_wifi_service_request_connect(WIFI_SSID, WIFI_PASS, 10, 0);
++    if (err != ESP_OK) {
++        ESP_LOGE(ESP_UTILS_LOG_TAG, "Wi-Fi connect request failed: %s", esp_err_to_name(err));
++    }
+     // The service may already have an address (e.g. the init call was a no-op).
+     if (board_wifi_service_is_connected()) {
+         s_wifi_connected.store(true, std::memory_order_relaxed);
+diff --git a/firmware/brookesia/sdkconfig.defaults b/firmware/brookesia/sdkconfig.defaults
+index 90d7545..8ce619b 100644
+--- a/firmware/brookesia/sdkconfig.defaults
++++ b/firmware/brookesia/sdkconfig.defaults
+@@ -82,6 +82,7 @@ CONFIG_LV_BUILD_EXAMPLES=n
+ CONFIG_LV_FONT_MONTSERRAT_12=y
+ CONFIG_LV_FONT_MONTSERRAT_16=y
+ CONFIG_LV_FONT_MONTSERRAT_20=y
++CONFIG_LV_FONT_MONTSERRAT_36=y
+ CONFIG_LV_FONT_FMT_TXT_LARGE=y
+ CONFIG_LV_USE_FONT_COMPRESSED=y
+ 

@@ -1,0 +1,9 @@
+// Copy to clock_config.h (same folder) and set your own location. The real file
+// is git-ignored. The weather comes from Open-Meteo, which needs no API key.
+// The time zone is set in main/user_config.h of the launcher (TZ_POSIX).
+#pragma once
+
+#define CLOCK_LOCATION_LABEL "YOUR TOWN, ST 00000"
+#define CLOCK_LAT            "34.0522"      // example: Los Angeles; use your own
+#define CLOCK_LON            "-118.2437"
+#define CLOCK_WEATHER_EVERY_S (30 * 60)

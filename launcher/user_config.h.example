@@ -1,0 +1,9 @@
+// Copy to firmware/brookesia/main/user_config.h (in your clone of Waveshare's repo)
+// and fill in. Never commit the real file: it holds your Wi-Fi password.
+#pragma once
+
+#define WIFI_SSID   "YourNetworkName"
+#define WIFI_PASS   "YourPassword"
+
+// POSIX time-zone string, e.g. US Pacific time with daylight saving:
+#define TZ_POSIX    "PST8PDT,M3.2.0,M11.1.0"

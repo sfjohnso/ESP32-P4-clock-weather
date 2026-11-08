@@ -1,0 +1,31 @@
+diff --git a/examples/esp-idf/09_video_lcd_display/main/main.c b/examples/esp-idf/09_video_lcd_display/main/main.c
+index a15fc72..c3af7a2 100644
+--- a/examples/esp-idf/09_video_lcd_display/main/main.c
++++ b/examples/esp-idf/09_video_lcd_display/main/main.c
+@@ -14,7 +14,7 @@
+ 
+ #define ALIGN_UP(num, align) (((num) + ((align) - 1)) & ~((align) - 1))
+ #define LCD_BUFFER_COUNT 2
+-#define CAMERA_BUFFER_COUNT 2
++#define CAMERA_BUFFER_COUNT 3
+ #define DMA_BUFFER_LINES_DEFAULT 120
+ #define DMA_BUFFER_LINES_MIN 10
+ 
+@@ -155,7 +155,7 @@ static void camera_video_frame_operation(
+         .rotation_angle = PPA_SRM_ROTATION_ANGLE_0,
+         .scale_x = scale_x,
+         .scale_y = scale_y,
+-        .mirror_x = 1,
++        .mirror_x = 0,
+         .mirror_y = 0,
+         .rgb_swap = 0,
+         .byte_swap = 0,
+@@ -190,7 +190,7 @@ static void camera_video_frame_operation(
+         }
+ 
+         bool is_last_block = (row_start + block_height) >= display_height;
+-        ret = esp_lv_adapter_dummy_draw_blit(disp, 0, row_start, display_width, row_start + block_height, dst, is_last_block);
++        ret = esp_lv_adapter_dummy_draw_blit(disp, 0, row_start, display_width, row_start + block_height, dst, true); /* wait: dst is reused for the next stripe */
+         if (ret != ESP_OK)
+         {
+             ESP_LOGE(TAG, "Dummy draw blit failed: %d", ret);

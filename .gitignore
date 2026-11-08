@@ -13,3 +13,7 @@ p4clock/main/font_data.c
 
 __pycache__/
 *.pyc
+
+# launcher: your location and Wi-Fi settings - copy the .example files instead
+launcher/ClockApp/clock_config.h
+launcher/user_config.h
