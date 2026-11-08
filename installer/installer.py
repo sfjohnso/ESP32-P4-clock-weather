@@ -1,16 +1,21 @@
 """Clock installer for the Waveshare ESP32-P4-WIFI6-Touch-LCD-3.5.
 
-Takes a U.S. street address, a Wi-Fi network name and its password, then flashes the
-clock program and its settings to the board over USB.
+Takes a location, a Wi-Fi network name and its password, then flashes the clock program
+and its settings to the board over USB. The location is either
 
-  - The address is turned into coordinates with the U.S. Census geocoder, and the time
-    zone is looked up from Open-Meteo. Only the coordinates, "CITY, ST ZIP" and the time
-    zone are stored on the clock, never the street address.
-  - The Wi-Fi name and password are stored in the board's flash in plain text.
+  - a U.S. street address, turned into coordinates by the U.S. Census geocoder, or
+  - a latitude and longitude anywhere in the world, e.g. "51.5074, -0.1278"
+    (north and east positive; south and west negative, or add N/S/E/W).
+
+The time zone comes from Open-Meteo and its daylight-saving rule from the IANA time zone
+database (the tzdata package). The clock stores only the coordinates, a short place name
+and the time zone, never a street address. The Wi-Fi name and password are stored in the
+board's flash in plain text.
 
 Run with no arguments for the window, or see --help for a scripted run.
 """
 import argparse
+import importlib.resources
 import json
 import os
 import queue
@@ -33,35 +38,6 @@ FIRMWARE_DIR = os.path.join(HERE, "firmware")
 APP_FILES = [(0x2000, "bootloader.bin"), (0x8000, "partition-table.bin"), (0x10000, "p4clock.bin")]
 CONFIG_OFFSET = 0x187000
 WAVESHARE_USB_VID = 0x1A86          # the board's USB-serial chip (CH343)
-
-# IANA zone name (from Open-Meteo) -> POSIX TZ string used by the clock.
-_EASTERN = "EST5EDT,M3.2.0,M11.1.0"
-_CENTRAL = "CST6CDT,M3.2.0,M11.1.0"
-_MOUNTAIN = "MST7MDT,M3.2.0,M11.1.0"
-_PACIFIC = "PST8PDT,M3.2.0,M11.1.0"
-_ALASKA = "AKST9AKDT,M3.2.0,M11.1.0"
-TIME_ZONES = {
-    "America/New_York": _EASTERN, "America/Detroit": _EASTERN,
-    "America/Kentucky/Louisville": _EASTERN, "America/Kentucky/Monticello": _EASTERN,
-    "America/Indiana/Indianapolis": _EASTERN, "America/Indiana/Vincennes": _EASTERN,
-    "America/Indiana/Winamac": _EASTERN, "America/Indiana/Marengo": _EASTERN,
-    "America/Indiana/Petersburg": _EASTERN, "America/Indiana/Vevay": _EASTERN,
-    "America/Chicago": _CENTRAL, "America/Indiana/Tell_City": _CENTRAL,
-    "America/Indiana/Knox": _CENTRAL, "America/Menominee": _CENTRAL,
-    "America/North_Dakota/Center": _CENTRAL, "America/North_Dakota/New_Salem": _CENTRAL,
-    "America/North_Dakota/Beulah": _CENTRAL,
-    "America/Denver": _MOUNTAIN, "America/Boise": _MOUNTAIN,
-    "America/Phoenix": "MST7",
-    "America/Los_Angeles": _PACIFIC,
-    "America/Anchorage": _ALASKA, "America/Juneau": _ALASKA, "America/Sitka": _ALASKA,
-    "America/Metlakatla": _ALASKA, "America/Yakutat": _ALASKA, "America/Nome": _ALASKA,
-    "America/Adak": "HST10HDT,M3.2.0,M11.1.0",
-    "Pacific/Honolulu": "HST10",
-    "America/Puerto_Rico": "AST4",
-    "Pacific/Guam": "ChST-10",
-    "Pacific/Pago_Pago": "SST11",
-}
-
 
 class InstallError(Exception):
     """A problem the user can act on; the message is shown as is."""
@@ -89,33 +65,86 @@ def geocode(address):
     matches = _get_json(url).get("result", {}).get("addressMatches", [])
     if not matches:
         raise InstallError("The Census geocoder could not find that address. Use the form "
-                           "'123 Main St, City, ST 12345' (US addresses only).")
+                           "'123 Main St, City, ST 12345' (U.S. addresses only). Anywhere else, enter "
+                           "a latitude and longitude instead, e.g. 51.5074, -0.1278.")
     m = matches[0]
     comp = m["addressComponents"]
-    return {"matched": m["matchedAddress"], "lat": m["coordinates"]["y"], "lon": m["coordinates"]["x"],
-            "city": comp.get("city", ""), "state": comp.get("state", ""), "zip": comp.get("zip", "")}
+    label = f"{comp.get('city', '')}, {comp.get('state', '')} {comp.get('zip', '')}".upper()
+    return {"described": f"Address found: {m['matchedAddress']}", "lat": m["coordinates"]["y"],
+            "lon": m["coordinates"]["x"], "label": _ascii_label(label)}
 
 
 def time_zone_for(lat, lon):
-    """Returns (IANA name, POSIX TZ string) for a coordinate."""
+    """Returns (IANA name, POSIX TZ string) for a coordinate anywhere in the world."""
     data = _get_json("https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
                      "&current=temperature_2m&timezone=auto" % (lat, lon))
     iana = data.get("timezone", "")
-    if iana not in TIME_ZONES:
-        raise InstallError(f"The time zone for that location ({iana or 'unknown'}) is not supported.")
-    return iana, TIME_ZONES[iana]
+    if not iana:
+        raise InstallError("Could not determine the time zone for that location.")
+    return iana, posix_tz(iana)
 
 
-def place_label(g):
-    """'CITY, ST ZIP' in plain printable ASCII (the clock's font has no other glyphs)."""
-    label = f"{g['city']}, {g['state']} {g['zip']}".upper()
-    label = re.sub(r"[^ -~]", "", label).strip()
-    return label[:39]
+def posix_tz(iana):
+    """The POSIX TZ rule for an IANA zone, read from the footer of its tzdata file."""
+    parts = iana.split("/")
+    package = "tzdata.zoneinfo" + "".join("." + p for p in parts[:-1])
+    try:
+        data = importlib.resources.files(package).joinpath(parts[-1]).read_bytes()
+    except (ImportError, OSError) as e:
+        raise InstallError(f"The time zone '{iana}' is not in the built-in time zone database.") from e
+    rule = data.rstrip(b"\n").rsplit(b"\n", 1)[-1].decode("ascii", "replace") if data[:4] == b"TZif" else ""
+    if not rule or len(rule) > 63:
+        raise InstallError(f"Could not read the daylight-saving rule for '{iana}'.")
+    # The clock's C library cannot parse a negative rule time (only Greenland has one,
+    # "M3.5.0/-1"); "/0" shifts that one changeover by an hour on a single night.
+    return re.sub(r"/-\d+(?::\d+)*", "/0", rule)
+
+
+_NUM = r"[-+]?\d+(?:\.\d+)?"
+_COORDS = re.compile(rf"^\s*({_NUM})\s*\u00b0?\s*([NSns])?\s*[,;/ ]\s*({_NUM})\s*\u00b0?\s*([EWew])?\s*$")
+
+
+def parse_coordinates(text):
+    """(lat, lon) if the text is 'latitude, longitude' in decimal degrees, else None.
+
+    Latitude comes first. South and west are negative, or use an N/S/E/W letter.
+    """
+    m = _COORDS.match(text)
+    if not m:
+        return None
+    lat, lon = float(m.group(1)), float(m.group(3))
+    if m.group(2):
+        lat = -abs(lat) if m.group(2).upper() == "S" else abs(lat)
+    if m.group(4):
+        lon = -abs(lon) if m.group(4).upper() == "W" else abs(lon)
+    if not -90 <= lat <= 90:
+        raise InstallError("The latitude must be between -90 and 90 (north is positive). "
+                           "Enter the latitude first, then the longitude.")
+    if not -180 <= lon <= 180:
+        raise InstallError("The longitude must be between -180 and 180 (east is positive).")
+    return lat, lon
+
+
+def _ascii_label(text):
+    """Plain printable ASCII, at most 39 characters (the clock's font has no other glyphs)."""
+    return re.sub(r"[^ -~]", "", text).strip()[:39]
+
+
+def locate(text):
+    """Turns what the user typed (address or coordinates) into a dict: lat, lon, label, described."""
+    if not text.strip():
+        raise InstallError("Enter a U.S. street address, or a latitude and longitude.")
+    coords = parse_coordinates(text)
+    if coords is None:
+        return geocode(text)
+    lat, lon = coords
+    label = "%.2f %s, %.2f %s" % (abs(lat), "N" if lat >= 0 else "S", abs(lon), "E" if lon >= 0 else "W")
+    return {"described": "Coordinates: %.4f, %.4f" % (lat, lon), "lat": lat, "lon": lon, "label": label}
 
 
 def make_config(ssid, password, g, posix_tz):
     """The JSON block the clock reads from its 'config' partition (NUL-terminated)."""
-    cfg = {"ssid": ssid, "pass": password, "label": place_label(g),
+    cfg = {"ssid": ssid, "pass": password, "label": g["label"],
            "lat": "%.4f" % g["lat"], "lon": "%.4f" % g["lon"], "tz": posix_tz}
     return json.dumps(cfg, separators=(",", ":")).encode("ascii") + b"\0"
 
@@ -162,16 +191,16 @@ def run_esptool(args, log):
         sys.stdout, sys.stderr = old
 
 
-def install(address, ssid, password, port, settings_only=False, log=print, confirm=None):
-    """Looks up the address, then flashes the clock and its settings. Raises InstallError."""
+def install(location, ssid, password, port, settings_only=False, log=print, confirm=None):
+    """Looks up the location, then flashes the clock and its settings. Raises InstallError."""
     check_wifi(ssid, password)
     if not port:
         raise InstallError("No board found. Plug the cable into the board's UART-C USB-C port (the "
                            "other USB-C port will not program), then click Refresh.")
-    log("Looking up the address...\n")
-    g = geocode(address)
+    log("Looking up the location...\n")
+    g = locate(location)
     iana, posix_tz = time_zone_for(g["lat"], g["lon"])
-    summary = (f"Address found: {g['matched']}\nClock will show: {place_label(g)}\n"
+    summary = (f"{g['described']}\nClock will show: {g['label']}\n"
                f"Time zone: {iana}\nWi-Fi network: {ssid}")
     log(summary + "\n")
     if confirm and not confirm(summary):
@@ -215,11 +244,12 @@ def run_gui():
     address, ssid, password, port = tk.StringVar(), tk.StringVar(), tk.StringVar(), tk.StringVar()
     settings_only, show_pw = tk.BooleanVar(), tk.BooleanVar()
 
-    ttk.Label(frame, text="U.S. street address").grid(row=0, column=0, sticky="w", pady=4)
+    ttk.Label(frame, text="Location").grid(row=0, column=0, sticky="w", pady=4)
     ttk.Entry(frame, textvariable=address).grid(row=0, column=1, columnspan=2, sticky="ew")
-    ttk.Label(frame, text="e.g. 123 Main St, Springfield, IL 62701. Used once to find your coordinates;\n"
-                          "the street address is not stored on the clock.",
-              foreground="#555").grid(row=1, column=1, columnspan=2, sticky="w")
+    ttk.Label(frame, text="A U.S. street address (123 Main St, Springfield, IL 62701) or a latitude and "
+                          "longitude anywhere in the world (51.5074, -0.1278; south and west are negative). "
+                          "Only the coordinates, a short place name and the time zone are stored on the clock.",
+              foreground="#555", wraplength=440, justify="left").grid(row=1, column=1, columnspan=2, sticky="w")
     ttk.Label(frame, text="Wi-Fi network name").grid(row=2, column=0, sticky="w", pady=(10, 4))
     ttk.Entry(frame, textvariable=ssid).grid(row=2, column=1, columnspan=2, sticky="ew", pady=(10, 4))
     ttk.Label(frame, text="Wi-Fi password").grid(row=3, column=0, sticky="w", pady=4)
@@ -315,13 +345,14 @@ def run_gui():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--address", help="scripted run: U.S. street address")
+    ap.add_argument("--location", "--address", dest="location",
+                    help="scripted run: U.S. street address, or \"latitude, longitude\"")
     ap.add_argument("--ssid", help="scripted run: Wi-Fi network name")
     ap.add_argument("--password-env", metavar="NAME", help="scripted run: environment variable holding the password")
     ap.add_argument("--port", help="scripted run: serial port, e.g. COM12 (default: the Waveshare board)")
     ap.add_argument("--settings-only", action="store_true", help="only rewrite the settings, not the program")
     args = ap.parse_args()
-    if not args.address:
+    if not args.location:
         run_gui()
         return
     port = args.port or next((p[0] for p in find_ports() if p[2]), "")
@@ -332,7 +363,7 @@ def main():
             console.write(text)
             console.flush()
     try:
-        install(args.address, args.ssid or "", os.environ.get(args.password_env or "", ""), port,
+        install(args.location, args.ssid or "", os.environ.get(args.password_env or "", ""), port,
                 args.settings_only, log=log)
     except InstallError as e:
         sys.exit(f"\n{e}")
