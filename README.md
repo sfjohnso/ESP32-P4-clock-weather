@@ -7,8 +7,9 @@ board; Claude wrote the code in small steps that were verified on the hardware.
 
 The left half shows an analog dial with a smooth second hand, the digital time and
 the date. The right half shows the current weather for your location: condition,
-temperature, feels-like, humidity and wind. Between 22:00 and 07:00 local time every
-color switches to a muted red so the screen is easy on the eyes at night. It starts
+temperature, feels-like, humidity and wind. When the room gets dark every
+color switches to a muted red and the backlight dims, so the screen is easy on the eyes at
+night; the board's camera is used as the light sensor (see "Night mode" below). It starts
 by itself at power-up (about 12 seconds to a full display) and refreshes the weather
 every 30 minutes.
 
@@ -64,8 +65,9 @@ Four decimal places (about 10 m) are plenty. Example: `#define LAT "34.1872"` an
 
 For other countries, look your zone up in a POSIX TZ list (for example the table at
 https://github.com/nayarsystems/posix_tz_db). The label under the date (PST, PDT, ...)
-comes from this string. The night colors begin at 22:00 and end at 07:00 local time;
-change `NIGHT_START_HOUR` / `NIGHT_END_HOUR` at the top of `main.c` if you like.
+comes from this string. The night colors follow the room's light (see "Night mode");
+`NIGHT_START_HOUR` / `NIGHT_END_HOUR` (22:00 / 07:00) at the top of `main.c` only apply when the
+camera cannot be used.
 Temperatures are shown in Fahrenheit and wind in mph (set in the request URL in
 `fetch_weather()` in `main.c`).
 
@@ -125,10 +127,31 @@ the bottom tells you how fresh the data is.
 again to flip back), handy when the board is mounted upside-down. The board starts
 in the normal orientation after every power-up.
 
+## Night mode (the camera as a light sensor)
+
+The OV5647 camera on the back of the board measures the room's light; no picture is ever taken
+or stored. `main/ambient.c` puts the sensor in a fixed long exposure (about 80 ms) with automatic
+gain and reads the gain it settles on every 5 seconds, averaged over 30 seconds: about 1x in a
+lit room, up to 64x in the dark.
+
+- When the gain reaches 32x (`NIGHT_STOPS` = 5, in `ambient.c`) the clock switches to the muted red
+  palette and fades the backlight down to 8% (`NIGHT_BACKLIGHT_PCT` in `main.c`). It switches back
+  to the normal colors when the gain falls to 16x (`DAY_STOPS` = 4). At power-up the screen starts
+  dim and brightens once the camera confirms the room is bright (about 5 seconds).
+- **Placement matters:** the camera must see the room, not a wall right behind the board. Facing a
+  nearby wall, the board's own shadow made it read dark all day; standing the board about 6 inches
+  (15 cm) from the wall fixed that.
+- The switch points were measured at the extremes (lit room about 0 stops, covered lens 6) and at one
+  room that looked "marginally bright" (about 3.6 stops); adjust the two constants to taste.
+- If the camera is missing or fails, the clock falls back to the 22:00 to 07:00 local-time rule.
+- Needs the `espressif/esp_cam_sensor` component (in `main/idf_component.yml`) and
+  `CONFIG_CAMERA_OV5647=y` (in `sdkconfig.defaults`); if you built before this was added, delete
+  `sdkconfig` and run `idf.py set-target esp32p4` again so the new default is picked up.
+
 ## Hardware notes
 
 * **Display:** ST7796, 320x480, SPI at 40 MHz (MOSI 20, SCLK 21, CS 23, DC 26,
-  RST 27, backlight 28 as a plain on/off pin). Pixel data is RGB565 and must be
+  RST 27, backlight 28 driven by PWM at 5 kHz, 10 bit). Pixel data is RGB565 and must be
   byte-swapped for SPI. This program rotates it to landscape with MADCTL `0x28`.
 * **Wi-Fi:** the ESP32-P4 has no radio of its own; Wi-Fi is the ESP32-C6 on the
   board, reached over SDIO through `esp_hosted` and `esp_wifi_remote`. The default
