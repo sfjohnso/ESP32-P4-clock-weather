@@ -48,8 +48,8 @@ The weather service (Open-Meteo) takes coordinates, not a zip code. Two ways to 
   through the results for the right country and copy its `latitude` and `longitude`.
 * **Use a map.** In an online map, right-click your spot and copy the coordinates.
 
-Four decimal places (about 10 m) are plenty. Example: `#define LAT "34.1872"` and
-`#define LON "-118.9114"`.
+Four decimal places (about 10 m) are plenty. Example (the Newbury Park Library): `#define LAT "34.1817"` and
+`#define LON "-118.9278"`.
 
 ### Time zone
 
