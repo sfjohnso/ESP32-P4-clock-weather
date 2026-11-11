@@ -130,19 +130,21 @@ in the normal orientation after every power-up.
 ## Night mode (the camera as a light sensor)
 
 The OV5647 camera on the back of the board measures the room's light; no picture is ever taken
-or stored. `main/ambient.c` puts the sensor in a fixed long exposure (about 80 ms) with automatic
+or stored. `main/ambient.c` puts the sensor in a fixed long exposure (about 310 ms) with automatic
 gain and reads the gain it settles on every 5 seconds, averaged over 30 seconds: about 1x in a
 lit room, up to 64x in the dark.
 
 - When the gain reaches 32x (`NIGHT_STOPS` = 5, in `ambient.c`) the clock switches to the muted red
-  palette and fades the backlight down to 8% (`NIGHT_BACKLIGHT_PCT` in `main.c`). It switches back
+  palette and fades the backlight down to 25% (`NIGHT_BACKLIGHT_PCT` in `main.c`), where it stays. It switches back
   to the normal colors when the gain falls to 16x (`DAY_STOPS` = 4). At power-up the screen starts
   dim and brightens once the camera confirms the room is bright (about 5 seconds).
 - **Placement matters:** the camera must see the room, not a wall right behind the board. Facing a
   nearby wall, the board's own shadow made it read dark all day; standing the board about 6 inches
   (15 cm) from the wall fixed that.
 - The switch points were measured at the extremes (lit room about 0 stops, covered lens 6) and at one
-  room that looked "marginally bright" (about 3.6 stops); adjust the two constants to taste.
+  room that looked "marginally bright" (about 3.6 stops); a lit room with a dark wall 8 inches
+  away reads about 3.7 at the 310 ms exposure (it read 5.4 at the earlier 80 ms, which was too short
+  and called that room dark); adjust the two constants to taste.
 - If the camera is missing or fails, the clock falls back to the 22:00 to 07:00 local-time rule.
 - Needs the `espressif/esp_cam_sensor` component (in `main/idf_component.yml`) and
   `CONFIG_CAMERA_OV5647=y` (in `sdkconfig.defaults`); if you built before this was added, delete
