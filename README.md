@@ -13,6 +13,15 @@ night; the board's camera is used as the light sensor (see "Night mode" below). 
 by itself at power-up (about 12 seconds to a full display) and refreshes the weather
 every 30 minutes.
 
+## The alarm
+
+The clock has one daily alarm. Hold the board's **BOOT** button for about 1.5 seconds to open the
+setting screen, pick the time with the arrows and tap **DONE**. A solid bell in the top corner means the
+alarm is on, an outline bell means off. It rings with a soft chime that starts quietly and gets louder; tap the
+screen to snooze for 10 minutes, double-press BOOT to stop it for the day. Holding BOOT for 8 seconds opens
+the phone setup for Wi-Fi and location. The alarm time is kept in the `config` partition and needs the clock
+to be running.
+
 | Folder | What it is |
 |---|---|
 | [p4clock](p4clock) | The ESP-IDF project |
