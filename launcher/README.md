@@ -1,50 +1,89 @@
-# Launcher: Clock app and notes for the Waveshare ESP-Brookesia firmware
+# P4 launcher and apps
 
-The Waveshare ESP32-P4-WIFI6-Touch-LCD-3.5 ships with a phone-style launcher
-(ESP-Brookesia on LVGL). Waveshare publishes its source under Apache-2.0:
-<https://github.com/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-3.5> (`firmware/brookesia`).
-This folder adds to it; none of Waveshare's code is copied here except as patches.
+A boot menu for the Waveshare ESP32-P4 3.5" board. It lists the built-in clock plus every `/apps/*.bin` on the SD
+card; tap an app, tap Launch. Pressing Reset (or any crash or power cycle) comes back to the menu, which counts
+down 3 s and then starts the clock unless the screen is touched.
 
-| Item | What it is |
-| --- | --- |
-| [`ADDING_APPS.md`](ADDING_APPS.md) | How to add an app to the launcher, plus the build recipe and the traps I hit |
-| [`ClockApp/`](ClockApp/) | A Clock app: analog dial, digital time, date and Open-Meteo weather (portrait, LVGL) |
-| [`patches/brookesia-launcher.patch`](patches/brookesia-launcher.patch) | Edits to `firmware/brookesia`: Clock first on the home screen, fixed Wi-Fi, Pacific time and SNTP, Xiaozhi font step removed, 36 px font |
-| [`user_config.h.example`](user_config.h.example) | Wi-Fi name, password and time zone for the patch (copy, fill in, never commit) |
-| [`patches/camera-example-09.md`](patches/camera-example-09.md) | Three fixes for Waveshare's standalone camera example `09_video_lcd_display` on ESP-IDF 5.5.6, with [`camera-example-09-main.patch`](patches/camera-example-09-main.patch) |
+## How it works
 
-Tested on a board with an ESP32-P4 rev v3.2 and ESP-IDF 5.5.6.
+Flash layout (`partitions.csv`; the first four rows keep the standalone clock's offsets):
 
-## Build the launcher with the Clock app and without Settings/AIChats
+| partition | offset   | size     | holds |
+|-----------|----------|----------|-------|
+| nvs       | 0x9000   | 0x6000   | |
+| phy_init  | 0xf000   | 0x1000   | |
+| factory   | 0x10000  | 0x177000 | this launcher |
+| config    | 0x187000 | 0x1000   | JSON settings (Wi-Fi, location), shared by every app |
+| otadata   | 0x188000 | 0x2000   | |
+| ota_0     | 0x190000 | 2 MB     | the built-in clock, flashed once |
+| ota_1     | 0x390000 | 8 MB     | scratch slot: the launcher copies the chosen SD app here |
 
-1. Clone Waveshare's repo and go to `firmware/brookesia`. Copy this folder's
-   `ClockApp/` into its `components/`.
-2. Apply the patch from the repo root: `git apply <path>/launcher/patches/brookesia-launcher.patch`.
-3. Copy `user_config.h.example` to `firmware/brookesia/main/user_config.h` and
-   fill it in. Copy `components/ClockApp/clock_config.h.example` to
-   `clock_config.h` in the same folder and set your location (the build fails
-   without it). Add both paths to `.git/info/exclude` so they are never committed.
-4. Take the Xiaozhi app and the Settings app UI out of the build (the patch
-   assumes you did; details and reasons in `ADDING_APPS.md`):
+Choosing an app copies `/apps/<name>.bin` into `ota_1` (skipped when the slot already holds that exact image, compared
+by ELF hash and the image's trailing SHA-256), selects it with `esp_ota_set_boot_partition()` and reboots.
 
-       cd firmware/brookesia
-       mkdir -p disabled/Settings
-       git mv components/XiaozhiApp disabled/XiaozhiApp
-       git mv components/Settings/Settings.cpp components/Settings/Settings.hpp \
-              components/Settings/ui components/Settings/assets disabled/Settings/
-       mv spiffs/xiaozhi disabled/xiaozhi-spiffs
+**One-shot boot.** The launcher is built with `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`. No app ever calls
+`esp_ota_mark_app_valid_cancel_rollback()`, so the bootloader marks each launch "pending verify" and, on the next reset
+of any kind, treats it as aborted and falls back to the factory image (the launcher). Apps need no code to return to the
+menu, and must not mark themselves valid.
 
-5. Build and flash as described in `ADDING_APPS.md` (note the
-   `IDF_EXTRA_ACTIONS_PATH` step for `idf.py bmgr`).
+An SD app is any ESP32-P4 app image (ESP-IDF 5.5.x, chip rev v3.x) that fits in `ota_1`. The menu label is the file name.
 
-If you want to keep Settings and AIChats, skip step 4 and the Wi-Fi and SNTP
-parts of the patch; the Clock app itself only needs a connected Wi-Fi.
+## First-time flash (from a project's build folder)
 
-## Clock app notes
+```
+python -m esptool --chip esp32p4 -p COM12 write_flash --flash_mode dio --flash_size 16MB --flash_freq 80m ^
+  0x2000 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin ^
+  0x10000 build/launcher.bin 0x188000 build/ota_data_initial.bin 0x190000 <p4clock.bin>
+```
 
-- Location for the weather is in `ClockApp/clock_config.h` (made from the `.example`); the time zone comes
-  from `TZ_POSIX` in `user_config.h`.
-- Not carried over from the standalone clock in `../p4clock`: night palette and
-  touch-to-flip. Temperatures print as `84 F` because the built-in Montserrat
-  fonts have no degree sign.
-- `ClockApp/assets/gen_icon.py` regenerates the 112x112 icon (needs Pillow).
+Do not write `config` (0x187000): it holds the clock's settings. Later launcher-only updates: write just `0x10000`.
+
+## Apps in this tree
+
+* `../p4clock`   built-in clock (runs from `ota_0`; unchanged by the launcher)
+* `../quake`     Quake port, `TOUCH_CONTROLS 0` = attract-mode demo only. A separate repository (a modified
+                 espressif/esp32-quake) that is NOT part of this one; the installer simply leaves it out when absent
+* `../photos`    slideshow of `/Photos` (JPEG by the P4 hardware decoder, PNG by libpng)
+* `../music`     album player for `/Music` (minimp3, ES8311 codec)
+* `../life`      Conway's Game of Life: five start modes, cells coloured by born / surviving / just died (no SD files needed)
+
+Each builds like any IDF project (`idf.py set-target esp32p4 && idf.py build`); copy its `build/<name>.bin` to
+`/apps/` on the card. Quake also needs `/id1/PAK0.PAK` (+ `PAK1.PAK`).
+
+## exFAT: the local `components/fatfs`
+
+ESP-IDF's FAT library is built without exFAT, and the 30 GB card may be exFAT. The launcher, photos, music and quake
+projects each carry a copy of `$IDF_PATH/components/fatfs` as `components/fatfs` (git-ignored, 2.6 MB each) with two
+edits to `src/ffconf.h`:
+
+```c
+#ifdef CONFIG_FATFS_USE_LABEL        // was: #define FF_USE_LABEL CONFIG_FATFS_USE_LABEL
+#define FF_USE_LABEL 1
+#else
+#define FF_USE_LABEL 0
+#endif
+...
+#define FF_FS_EXFAT 1                // was 0
+```
+
+Run `idf.py reconfigure` after adding it, or the override is not picked up. Settings used: `CONFIG_FATFS_LFN_STACK=y`,
+`CONFIG_FATFS_MAX_LFN=255` (music also `CONFIG_FATFS_API_ENCODING_UTF_8=y` for non-ASCII file names).
+
+## Testing an app without going through the menu
+
+With the card in the board, write the app straight into `ota_1` and select it; the setting is then persistent, so
+restore the menu afterwards by erasing otadata:
+
+```
+python -m esptool --chip esp32p4 -p COM12 write_flash 0x390000 build/<app>.bin
+python %IDF_PATH%/components/app_update/otatool.py --port COM12 --partition-table-file ../launcher/build/partition_table/partition-table.bin --partition-table-offset 0x8000 switch_ota_partition --name ota_1
+...
+python %IDF_PATH%/components/app_update/otatool.py ... erase_otadata
+```
+
+Remember to copy the same build to `/apps/` on the card, or the launcher will copy the older card version over it.
+
+## Going back to the standalone clock
+
+The pre-launcher single-app firmware is tagged `p4clock-standalone-v1`; `installer/` still builds an installer that
+rewrites the partition table to that layout.

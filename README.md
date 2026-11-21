@@ -24,7 +24,11 @@ to be running.
 
 | Folder | What it is |
 |---|---|
-| [p4clock](p4clock) | The ESP-IDF project |
+| [p4clock](p4clock) | The clock: the ESP-IDF project |
+| [launcher](launcher) | The boot menu: runs apps from the SD card, and returns to the menu on Reset |
+| [photos](photos), [music](music), [life](life) | Apps for the launcher: a slideshow, an MP3 album player, Conway's Game of Life |
+| [installer](installer) | A Windows program that flashes the launcher and clock, sets up the SD card and tests the board |
+| [brookesia-launcher](brookesia-launcher) | Notes and a Clock app for the phone-style launcher the board ships with |
 
 ## Before you build: set your network, location and time zone
 
@@ -178,18 +182,24 @@ lit room, up to 64x in the dark.
 * **Flash:** `sdkconfig.defaults` sets 16 MB flash and the large single-app partition
   table; the application is about 1 MB.
 
-## Also in this repo: an installer
+## Also in this repo: the launcher, the apps and the installer
 
-[`installer/`](installer/) is a Windows program that takes a U.S. street address, a Wi-Fi
-name and a password and installs this clock on a board in one click. Its source is here;
-the finished `.exe` is not, because the firmware it carries contains Segoe UI glyph
-data that Microsoft does not allow redistributing.
+The clock runs under a small **launcher** ([`launcher/`](launcher/)): after every reset it shows a touch menu of the
+built-in clock plus every app on the SD card, and starts the clock by itself after 3 seconds. The apps
+([`photos/`](photos/), [`music/`](music/), [`life/`](life/)) are separate ESP-IDF projects whose `.bin` files go in the card's
+`apps` folder. Read [`launcher/README.md`](launcher/README.md) for the flash layout and how to write your own app.
 
-## Also in this repo: the launcher
+[`installer/`](installer/) is a Windows program that does the whole setup in five steps (flash the launcher and clock, add
+the apps to the card, add music and photos, eject, test). Its source is here; the finished `.exe` is not, because the
+firmware it carries contains Segoe UI glyph data that Microsoft does not allow redistributing. On a Mac or Linux machine
+flash with `esptool` as described in `launcher/README.md`. The Quake demo app lives in a separate repository and is not
+included.
 
-[`launcher/`](launcher/) has notes on adding apps to the phone-style launcher that
+## Also in this repo: the phone-style launcher notes
+
+[`brookesia-launcher/`](brookesia-launcher/) has notes on adding apps to the phone-style launcher that
 ships on this board (Waveshare's ESP-Brookesia firmware), a portrait Clock app for
-it, and fixes for Waveshare's standalone camera example on ESP-IDF 5.5.6.
+it, and fixes for Waveshare's standalone camera example on ESP-IDF 5.5.6. It is an alternative to the launcher above, not a part of it.
 
 ## License
 

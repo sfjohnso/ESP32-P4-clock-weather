@@ -20,3 +20,35 @@ launcher/user_config.h
 
 # installer build output in the clock project
 p4clock/build_installer/
+
+# launcher and apps: build output, fetched dependencies, local fatfs copy (see launcher/README.md)
+launcher/build/
+launcher/sdkconfig
+launcher/sdkconfig.old
+launcher/dependencies.lock
+launcher/managed_components/
+launcher/components/
+photos/build/
+photos/sdkconfig
+photos/sdkconfig.old
+photos/dependencies.lock
+photos/managed_components/
+photos/components/
+music/build/
+music/sdkconfig
+music/sdkconfig.old
+music/dependencies.lock
+music/managed_components/
+music/components/
+life/build/
+life/sdkconfig
+life/sdkconfig.old
+life/dependencies.lock
+life/managed_components/
+
+# installer build output and bundled binaries (they contain font data that cannot be redistributed)
+installer/.venv/
+installer/build/
+installer/dist/
+installer/firmware/
+installer/apps/
