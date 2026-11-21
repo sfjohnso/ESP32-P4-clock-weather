@@ -45,6 +45,11 @@ life/sdkconfig
 life/sdkconfig.old
 life/dependencies.lock
 life/managed_components/
+sound/build/
+sound/sdkconfig
+sound/sdkconfig.old
+sound/dependencies.lock
+sound/managed_components/
 
 # installer build output and bundled binaries (they contain font data that cannot be redistributed)
 installer/.venv/

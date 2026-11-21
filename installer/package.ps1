@@ -18,7 +18,7 @@ Remove-Item Env:P4CLOCK_INSTALLER_BUILD
 
 # 2. The launcher and the apps (their normal build folders; configured once with set-target esp32p4).
 # quake is a separate repository and optional: it is built and bundled only if a quake folder is next to the others.
-$names = @('launcher', 'photos', 'music', 'life')
+$names = @('launcher', 'photos', 'music', 'life', 'sound')
 if (Test-Path (Join-Path $projects 'quake')) { $names += 'quake' }
 foreach ($name in $names) {
     Push-Location (Join-Path $projects $name)
@@ -41,6 +41,7 @@ if ($names -contains 'quake') { Copy-Item (Join-Path $projects 'quake\build\quak
 Copy-Item (Join-Path $projects 'photos\build\photos.bin') "$apps\Photos.bin"
 Copy-Item (Join-Path $projects 'music\build\music.bin') "$apps\Music.bin"
 Copy-Item (Join-Path $projects 'life\build\life.bin') "$apps\Life.bin"
+Copy-Item (Join-Path $projects 'sound\build\sound.bin') "$apps\Sound Meter.bin"
 
 # 4. Safety check: the real Wi-Fi name and password from main\user_config.h must not be in the bundle.
 $py = Join-Path $here '.venv\Scripts\python.exe'

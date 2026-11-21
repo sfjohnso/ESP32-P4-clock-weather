@@ -26,7 +26,7 @@ to be running.
 |---|---|
 | [p4clock](p4clock) | The clock: the ESP-IDF project |
 | [launcher](launcher) | The boot menu: runs apps from the SD card, and returns to the menu on Reset |
-| [photos](photos), [music](music), [life](life) | Apps for the launcher: a slideshow, an MP3 album player, Conway's Game of Life |
+| [photos](photos), [music](music), [life](life), [sound](sound) | Apps for the launcher: a slideshow, an MP3 album player, Conway's Game of Life, a microphone VU meter and spectrogram |
 | [installer](installer) | A Windows program that flashes the launcher and clock, sets up the SD card and tests the board |
 | [brookesia-launcher](brookesia-launcher) | Notes and a Clock app for the phone-style launcher the board ships with |
 
@@ -186,7 +186,7 @@ lit room, up to 64x in the dark.
 
 The clock runs under a small **launcher** ([`launcher/`](launcher/)): after every reset it shows a touch menu of the
 built-in clock plus every app on the SD card, and starts the clock by itself after 3 seconds. The apps
-([`photos/`](photos/), [`music/`](music/), [`life/`](life/)) are separate ESP-IDF projects whose `.bin` files go in the card's
+([`photos/`](photos/), [`music/`](music/), [`life/`](life/), [`sound/`](sound/)) are separate ESP-IDF projects whose `.bin` files go in the card's
 `apps` folder. Read [`launcher/README.md`](launcher/README.md) for the flash layout and how to write your own app.
 
 [`installer/`](installer/) is a Windows program that does the whole setup in five steps (flash the launcher and clock, add
