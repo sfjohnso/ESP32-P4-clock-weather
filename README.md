@@ -195,6 +195,10 @@ firmware it carries contains Segoe UI glyph data that Microsoft does not allow r
 flash with `esptool` as described in `launcher/README.md`. The Quake demo app lives in a separate repository and is not
 included.
 
+## Also in this repo: a desk stand
+
+`stand/` holds the design files for a 3D-printable desk stand (STL, STEP, and the CadQuery scripts that make them), plus a machined version. See [stand/README.md](stand/README.md).
+
 ## Also in this repo: the phone-style launcher notes
 
 [`brookesia-launcher/`](brookesia-launcher/) has notes on adding apps to the phone-style launcher that
