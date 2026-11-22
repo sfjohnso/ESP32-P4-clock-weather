@@ -28,6 +28,8 @@
 #include "esp_timer.h"
 #include "esp_vfs_fat.h"
 #include "freertos/FreeRTOS.h"
+#include "nvs.h"
+#include "nvs_flash.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "sd_pwr_ctrl_by_on_chip_ldo.h"
@@ -482,6 +484,22 @@ void app_main(void)
     flush();
     scan_sd(slot);
     sel = 0;
+
+    // The Voice app asks for an app by name (NVS "voice"/"next"); open it straight away, once.
+    esp_err_t nr = nvs_flash_init();
+    if (nr == ESP_ERR_NVS_NO_FREE_PAGES || nr == ESP_ERR_NVS_NEW_VERSION_FOUND) { nvs_flash_erase(); nvs_flash_init(); }
+    nvs_handle_t nh;
+    if (nvs_open("voice", NVS_READWRITE, &nh) == ESP_OK) {
+        char want[48];
+        size_t n = sizeof want;
+        if (nvs_get_str(nh, "next", want, &n) == ESP_OK) {
+            nvs_erase_key(nh, "next");
+            nvs_commit(nh);
+            for (int i = 0; i < nentries; i++)
+                if (!strcasecmp(entries[i].name, want)) { sel = i; draw_all(); flush(); launch(&entries[i]); break; }
+        }
+        nvs_close(nh);
+    }
     countdown_end_us = esp_timer_get_time() + COUNTDOWN_S * 1000000LL;
 
     bool was_down = false, in_list = false, dragging = false, on_button = false;

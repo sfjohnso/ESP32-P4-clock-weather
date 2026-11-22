@@ -3,7 +3,7 @@
 A five-step window:
 
   1. Connect the board over USB and flash the launcher and the clock, plus the clock's settings.
-  2. Put the board's microSD card in this PC; the installer adds the apps (Quake Demo, Photos, Music, Life, Sound Meter) and
+  2. Put the board's microSD card in this PC; the installer adds the apps (Quake Demo, Photos, Music, Life, Sound Meter, Voice) and
      creates the id1, Music and Photos folders. The Quake .pak files come from the user's own copy of Quake.
   3. The user adds music and photos.
   4. Eject the card.
@@ -49,6 +49,7 @@ import serial.tools.list_ports
 
 HERE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 FIRMWARE_DIR = os.path.join(HERE, "firmware")
+SRMODELS_DIR = os.path.join(HERE, "srmodels")   # speech models for the Voice app, copied to the card as /srmodels
 APPS_DIR = os.path.join(HERE, "apps")           # the apps that go on the SD card, named as they appear in the menu
 
 # Flash layout; must match launcher/partitions.csv (the clock lives in ota_0, the launcher in the factory slot).
@@ -56,7 +57,7 @@ FLASH_FILES = [(0x2000, "bootloader.bin"), (0x8000, "partition-table.bin"), (0x1
                (0x188000, "ota_data_initial.bin"), (0x190000, "p4clock.bin")]
 CONFIG_OFFSET = 0x187000
 WAVESHARE_USB_VID = 0x1A86          # the board's USB-serial chip (CH343)
-CARD_FOLDERS = ("apps", "id1", "Music", "Photos")
+CARD_FOLDERS = ("apps", "id1", "Music", "Photos", "srmodels")
 CARD_FILESYSTEMS = ("FAT", "FAT32", "EXFAT")    # what the board can read
 
 
@@ -434,6 +435,12 @@ def prepare_card(root, pak_dir="", log=print):
             raise InstallError(f"No .pak files in {pak_dir}. Pick the folder that holds PAK0.PAK (for Steam: "
                                "...\\steamapps\\common\\Quake\\id1), or leave it empty to skip Quake's data.")
     need = sum(os.path.getsize(os.path.join(APPS_DIR, a)) for a in apps)
+    models = []                                     # (source, destination relative to the card's srmodels folder)
+    for base, _, files in os.walk(SRMODELS_DIR):
+        for f in files:
+            src = os.path.join(base, f)
+            models.append((src, os.path.relpath(src, SRMODELS_DIR)))
+            need += os.path.getsize(src)
     need += sum(os.path.getsize(os.path.join(pak_dir, p)) for p in paks)
     if shutil.disk_usage(root).free < need + (50 << 20):
         raise InstallError("There is not enough free space on the card for the apps and the Quake data.")
@@ -445,6 +452,14 @@ def prepare_card(root, pak_dir="", log=print):
     log("Adding the apps to the apps folder...\n")
     for app in apps:
         _copy(os.path.join(APPS_DIR, app), os.path.join(root, "apps", app), log)
+    if models:
+        log("Adding the speech models for the Voice app to the srmodels folder...\n")
+        for src, rel in models:
+            dst = os.path.join(root, "srmodels", rel)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            if os.path.isfile(dst) and os.path.getsize(dst) == os.path.getsize(src):
+                continue
+            _copy(src, dst, log)
     warnings = []
     if paks:
         log("Adding the Quake data to the id1 folder...\n")
@@ -748,7 +763,7 @@ def run_gui():
     verify_btn = ttk.Button(f, text="Restart the board and test")
     verify_btn.pack(fill="x", pady=(6, 4), ipady=3)
     ttk.Label(f, text="After it passes, try the apps yourself: restart the board and touch the screen within 3 "
-                      "seconds to keep the menu, then tap Photos, Music, Life, Sound Meter or Quake Demo and Launch. The Reset button "
+                      "seconds to keep the menu, then tap Photos, Music, Life, Sound Meter, Voice or Quake Demo and Launch. The Reset button "
                       "always brings you back to the menu.", foreground="#555", wraplength=560,
               justify="left").pack(anchor="w", pady=4)
 

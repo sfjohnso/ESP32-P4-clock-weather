@@ -17,10 +17,7 @@ Pop-Location
 Remove-Item Env:P4CLOCK_INSTALLER_BUILD
 
 # 2. The launcher and the apps (their normal build folders; configured once with set-target esp32p4).
-# quake is a separate repository and optional: it is built and bundled only if a quake folder is next to the others.
-$names = @('launcher', 'photos', 'music', 'life', 'sound')
-if (Test-Path (Join-Path $projects 'quake')) { $names += 'quake' }
-foreach ($name in $names) {
+foreach ($name in 'launcher', 'photos', 'music', 'life', 'sound', 'voice', 'quake') {
     Push-Location (Join-Path $projects $name)
     idf.py build
     if ($LASTEXITCODE -ne 0) { throw "$name build failed" }
@@ -37,11 +34,19 @@ Copy-Item "$l\partition_table\partition-table.bin" "$fw\partition-table.bin"
 Copy-Item "$l\launcher.bin" "$fw\launcher.bin"
 Copy-Item "$l\ota_data_initial.bin" "$fw\ota_data_initial.bin"
 Copy-Item "$clock\build_installer\p4clock.bin" "$fw\p4clock.bin"
-if ($names -contains 'quake') { Copy-Item (Join-Path $projects 'quake\build\quake.bin') "$apps\Quake Demo.bin" }
+Copy-Item (Join-Path $projects 'quake\build\quake.bin') "$apps\Quake Demo.bin"
 Copy-Item (Join-Path $projects 'photos\build\photos.bin') "$apps\Photos.bin"
 Copy-Item (Join-Path $projects 'music\build\music.bin') "$apps\Music.bin"
 Copy-Item (Join-Path $projects 'life\build\life.bin') "$apps\Life.bin"
 Copy-Item (Join-Path $projects 'sound\build\sound.bin') "$apps\Sound Meter.bin"
+Copy-Item (Join-Path $projects 'voice\build\voice.bin') "$apps\Voice.bin"
+# Speech models for the Voice app (wake word Hi ESP, English commands, command grammar); they go on the SD card.
+$sr = Join-Path $here 'srmodels'
+Remove-Item $sr -Recurse -Force -ErrorAction SilentlyContinue
+$v = Join-Path $projects 'voice'
+python (Join-Path $v 'managed_components\espressif__esp-sr\model\movemodel.py') -d1 (Join-Path $v 'sdkconfig') -d2 (Join-Path $v 'managed_components\espressif__esp-sr') -d3 (Join-Path $v 'build') | Out-Null
+New-Item -ItemType Directory -Force $sr | Out-Null
+foreach ($m in 'mn7_en', 'wn9_hiesp', 'fst') { Copy-Item (Join-Path $v "build\srmodels\$m") (Join-Path $sr $m) -Recurse }
 
 # 4. Safety check: the real Wi-Fi name and password from main\user_config.h must not be in the bundle.
 $py = Join-Path $here '.venv\Scripts\python.exe'
@@ -53,7 +58,7 @@ foreach ($dir in $fw, $apps) {
 # 5. One-file Windows program with the firmware and apps inside.
 & (Join-Path $here '.venv\Scripts\pyinstaller.exe') --noconfirm --clean --onefile --windowed `
     --name P4ClockInstaller --collect-all esptool --collect-data tzdata `
-    --add-data "$fw;firmware" --add-data "$apps;apps" `
+    --add-data "$fw;firmware" --add-data "$apps;apps" --add-data "$sr;srmodels" `
     --distpath (Join-Path $here 'dist') --workpath (Join-Path $here 'build') --specpath (Join-Path $here 'build') `
     (Join-Path $here 'installer.py')
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed' }

@@ -57,3 +57,11 @@ installer/build/
 installer/dist/
 installer/firmware/
 installer/apps/
+
+# voice app: build output and fetched dependencies; bundled speech models
+voice/build/
+voice/sdkconfig
+voice/sdkconfig.old
+voice/dependencies.lock
+voice/managed_components/
+installer/srmodels/

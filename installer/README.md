@@ -2,7 +2,7 @@
 
 A Windows program that sets up a Waveshare ESP32-P4-WIFI6-Touch-LCD-3.5 from scratch: the **launcher** (a touch
 menu that starts apps from the SD card), the **clock and weather display**, and an SD card with the apps
-(**Photos, Music, Life, Sound Meter** and, if you build it, **Quake Demo**). It walks through five steps and finishes by testing the board.
+(**Photos, Music, Life, Sound Meter, Voice** and, if you build it, **Quake Demo**). It walks through five steps and finishes by testing the board.
 
 ## Using it (for the person receiving the .exe)
 
