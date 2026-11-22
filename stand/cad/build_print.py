@@ -1,9 +1,9 @@
-"""3D-printable stand base (STL + STEP), same footprint and lean as the machined version.
+"""3D-printable stand base (STL + STEP), pocket for the board, leaning back 14.43 deg.
 
-Differences from build_base.py (the CNC part):
-  * the lip's rear face leans back parallel to the screen (an undercut a router cannot cut, but 14.4 deg from
+Features:
+  * the lip's rear face leans back parallel to the screen (an overhang, but 14.4 deg from
     vertical is fine for FDM, no supports);
-  * the two 1/4 in rods are replaced by two printed rear stops (12 x 4 mm blocks, 10 mm above the floor);
+  * two printed rear stops (12 x 4 mm blocks, 10 mm above the floor);
   * two relief grooves in the pocket floor, so that whichever edge of the unit is at the bottom (USB right:
     the plain edge; USB left: the edge with PWR/RST/microSD) has room for a card or a button, while edges
     A and B (the only places the unit touches the floor) keep a narrow land.
@@ -18,7 +18,7 @@ import cadquery as cq
 HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, "..", "make_stand.py"), encoding="utf-8").read()
 g = {"__file__": os.path.join(HERE, "..", "make_stand.py")}
-exec(src[:src.index("# ------------------------------------------------------------------ SVG helpers")], g)
+exec(src, g)
 
 W, H, R = g["W"], g["H"], g["R"]
 STOCK, BASE, EDGE_R = g["STOCK"], g["BASE"], g["EDGE_R"]

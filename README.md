@@ -197,7 +197,7 @@ included.
 
 ## Also in this repo: a desk stand
 
-`stand/` holds the design files for a 3D-printable desk stand (STL, STEP, and the CadQuery scripts that make them), plus a machined version. See [stand/README.md](stand/README.md).
+`stand/` holds the design files for a 3D-printable desk stand (STL, STEP, and the CadQuery script that makes them). See [stand/README.md](stand/README.md).
 
 ## Also in this repo: the phone-style launcher notes
 
